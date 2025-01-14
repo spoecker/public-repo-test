@@ -1,0 +1,39 @@
+FROM php:8.2-fpm-alpine
+
+# Install PostgreSQL client and other required packages
+RUN apk add --no-cache \
+    postgresql-dev \
+    postgresql-client \
+    openssl \
+    tzdata \
+    && docker-php-ext-install pdo pdo_pgsql
+
+# Set timezone
+ENV TZ=Asia/Bangkok
+
+COPY src/ /var/www/html/
+# Copy entrypoint script
+COPY docker/docker-entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Copy PHP-FPM configuration
+COPY docker/www.conf /usr/local/etc/php-fpm.d/www.conf
+
+
+# Copy the health check script to a specific directory
+COPY docker/healthcheck.sh /usr/local/bin/healthcheck.sh
+
+# Make sure the script is executable
+RUN chmod +x /usr/local/bin/healthcheck.sh
+
+#SSL
+# Create directory for certificates
+RUN mkdir -p /etc/ssl/postgresql
+
+RUN wget https://truststore.pki.rds.amazonaws.com/ap-southeast-7/ap-southeast-7-bundle.pem -O /etc/ssl/postgresql/root.crt && \
+    chmod 644 /etc/ssl/postgresql/root.crt
+
+WORKDIR /var/www/html
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["php-fpm"]

@@ -1,0 +1,66 @@
+services:
+  webserver:
+    build:
+      context: ../aws-community/
+      dockerfile: ../aws-community/Dockerfile-webserver
+    healthcheck:
+      test: ["CMD-SHELL", "wget -O /dev/null http://localhost || exit 1"]
+      timeout: 10s
+    ports:
+      - "80:80"
+    depends_on:
+      - php
+    networks:
+      - app-network
+    restart: always
+
+  php:
+    build:
+      context: ../aws-community/
+      dockerfile: ../aws-community/Dockerfile-php
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=myapp
+      - DB_USERNAME=myuser
+      - DB_PASSWORD=mypassword
+      - TZ=Asia/Bangkok
+    healthcheck:
+      test: ["CMD", "sh", "/usr/local/bin/healthcheck.sh"]
+      interval: 5s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: always
+
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=myapp
+      - POSTGRES_USER=myuser
+      - POSTGRES_PASSWORD=mypassword
+      - TZ=Asia/Bangkok
+      - PGTZ=Asia/Bangkok
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myuser -d myapp"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+    restart: always
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
